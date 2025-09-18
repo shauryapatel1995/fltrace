@@ -100,9 +100,9 @@ static inline fault_t* read_uffd_fault()
         addr = faulting_addr & (~(4096 - 1)) ;
         flags = message.arg.pagefault.flags;
 	pc = message.arg.pagefault.pc;
-// [  371.031515] "155021 PF addr, faulting addr, and ip", 7f58fe09a000 7f58fe09a188 7f58fe0a0759
+	pagefault_index++;
 
-	printf("%d PF addr, faulting addr, and ip, %lx %lx %lx\n", pagefault_index, addr, faulting_addr, pc);
+	fprintf(stderr, "\"%d PF addr, faulting addr, and ip\", %lx %lx %lx\n", pagefault_index, addr, faulting_addr, pc);
         log_debug("uffd pagefault event %d: addr=%llx, flags=0x%llx",
             message.event, addr, flags);
 

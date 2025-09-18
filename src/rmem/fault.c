@@ -275,7 +275,7 @@ void fault_done(fault_t* f)
         if (*p == 0)
 		continue;
 	// TODO(shaurp): Fix the present bit here.
-	printf("Loc:%d, val:%llx, present:%d\n", i, *p, 1);
+	fprintf(stderr, "Loc: %d, val: %llx, present:%d\n", i, *p, 1);
     }
 
     /* remove lock (in ascending order) */
