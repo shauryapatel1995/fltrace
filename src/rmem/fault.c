@@ -270,6 +270,13 @@ void fault_done(fault_t* f)
     int i, r;
     pgthread_t owner_kthr;
     pgflags_t oldflags;
+    uint64_t *p = (uint64_t*) f->page; 
+    for(i = 0; i < 512; i++, p++) {
+        if (*p == 0)
+		continue;
+	// TODO(shaurp): Fix the present bit here.
+	printf("Loc:%d, val:%llx, present:%d\n", i, *p, 1);
+    }
 
     /* remove lock (in ascending order) */
     if (f->locked_pages) {

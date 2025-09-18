@@ -30,6 +30,7 @@ __thread struct hthread *my_hthr = NULL;
 __thread int current_stealing_kthr_id = -1;
 __thread unsigned long current_blocking_page = 0;
 __thread bool current_page_unblocked = false;
+int pagefault_index = 0;
 
 /* check if a fault already exists in the wait queue */
 bool does_fault_exist_in_wait_q(struct fault *fault)
@@ -60,7 +61,8 @@ static inline fault_t* read_uffd_fault()
     ssize_t read_size;
     struct uffd_msg message;
     struct fault* fault;
-    unsigned long long addr, flags;
+    unsigned long long faulting_addr, addr, flags;
+    unsigned long pc;
     struct region_t* mr;
 
     struct pollfd evt = { .fd = userfault_fd, .events = POLLIN };
@@ -94,8 +96,13 @@ static inline fault_t* read_uffd_fault()
         }
 
         /* new fault */
-        addr = message.arg.pagefault.address;
+        faulting_addr = message.arg.pagefault.address;
+        addr = faulting_addr & (~(4096 - 1)) ;
         flags = message.arg.pagefault.flags;
+	pc = message.arg.pagefault.pc;
+// [  371.031515] "155021 PF addr, faulting addr, and ip", 7f58fe09a000 7f58fe09a188 7f58fe0a0759
+
+	printf("%d PF addr, faulting addr, and ip, %lx %lx %lx\n", pagefault_index, addr, faulting_addr, pc);
         log_debug("uffd pagefault event %d: addr=%llx, flags=0x%llx",
             message.event, addr, flags);
 
@@ -136,7 +143,7 @@ static inline fault_t* read_uffd_fault()
 
         /* record if sampling faults */
         fsampler_add_fault_sample(my_hthr->fsampler_id, addr, flags,
-            message.arg.pagefault.feat.ptid);
+            0);
 #endif
 
         return fault;
