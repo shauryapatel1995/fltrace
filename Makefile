@@ -1,14 +1,17 @@
 INC     = -I./src/inc
-CFLAGS  = -g -Wall -std=gnu11 -D_GNU_SOURCE $(INC) -mssse3
+CFLAGS  = -g -Wall -std=gnu11 -D_GNU_SOURCE $(INC) -mssse3 -I/data1/linux/usr/include
 LDFLAGS = -T src/base/base.ld -no-pie
 LD	= gcc
 CC	= gcc
 AR	= ar
 FLTRACE = fltrace.so
+XGBOOST_INC = -I/usr/include/xgboost
+XGBOOST_LIBS = -lxgboost
 
 # Path and dir of this makefile
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MKFILE_DIR := $(dir $(MKFILE_PATH))
+
 
 #
 # Make options
@@ -52,7 +55,7 @@ ifeq ($(JEMALLOC_STATIC_LIBS),)
 $(error JEMALLOC libs not found. Did you run ./deps.sh [-f]?)
 endif
 endif
-CFLAGS += $(JEMALLOC_INC)
+CFLAGS += $(JEMALLOC_INC) $(XGBOOST_INC)
 
 #
 # Libs
@@ -95,7 +98,7 @@ librmem.a: $(rmem_obj)
 # use "make fltrace.so"
 $(FLTRACE): $(main_obj) libs src/base/base.ld
 	$(LD) $(CFLAGS) $(LDFLAGS) -shared $(main_obj) -o $(FLTRACE)	\
-		librmem.a libbase.a $(JEMALLOC_STATIC_LIBS) -lpthread -lm -ldl 
+		librmem.a libbase.a $(JEMALLOC_STATIC_LIBS) $(XGBOOST_LIBS) -lpthread -lm -ldl 
 
 ## general build rules for all targets
 src = $(base_src) $(rmem_src) ${main_src}
