@@ -74,17 +74,35 @@ int load_model(XGBoostModel* model, const char* model_path) {
         return -1;
     }
     
+    // First check if file exists and is readable
+    FILE* test_file = fopen(model_path, "r");
+    if (!test_file) {
+        fprintf(stderr, "Error: Cannot open model file '%s'\n", model_path);
+        perror("File error");
+        return -1;
+    }
+    fclose(test_file);
+    printf("Model file exists and is readable: %s\n", model_path);
+    
     printf("Creating booster\n");
     // Create booster
     if (XGBoosterCreate(NULL, 0, &model->booster) != 0) {
         fprintf(stderr, "Failed to create XGBooster\n");
+        const char* error_msg = XGBGetLastError();
+        if (error_msg) {
+            fprintf(stderr, "XGBoost error: %s\n", error_msg);
+        }
         return -1;
     }
     
     printf("Loading model\n");
     // Load model from file
     if (XGBoosterLoadModel(model->booster, model_path) != 0) {
-	    printf("Loading failed\n");
+        printf("Loading failed\n");
+        const char* error_msg = XGBGetLastError();
+        if (error_msg) {
+            fprintf(stderr, "XGBoost error: %s\n", error_msg);
+        }
         fprintf(stderr, "Failed to load model from %s\n", model_path);
         XGBoosterFree(model->booster);
         model->booster = NULL;
