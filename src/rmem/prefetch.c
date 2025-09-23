@@ -104,7 +104,10 @@ int load_model(XGBoostModel* model, const char* model_path) {
         }
     }
     
-    printf("Loading model\n");
+    printf("Loading model (config: {\"validate_parameters\": \"0\"})\n");
+    // Disable parameter validation to avoid objective function check
+    XGBoosterSetParam(model->booster, "validate_parameters", "0");
+    
     // Load model from file
     if (XGBoosterLoadModel(model->booster, model_path) != 0) {
         printf("Loading failed\n");
