@@ -32,6 +32,8 @@ typedef struct {
     int is_loaded;
 } XGBoostModel;
 
+static XGBoostModel* global_model = NULL;
+
 typedef struct {
     uint32_t pc;
     int offset;
@@ -282,6 +284,26 @@ void free_model(XGBoostModel* model) {
 }
 
 
+void init_prefetcher() {
+    const char* model_path = "/data1/deku/models/random-ll-fltrace_xgboost_model.json";
+    printf("Initializing prefetcher...\n");
+    
+    global_model = init_model();
+    if (!global_model) {
+        printf("Model not initialized\n");
+        return;
+    }
+    printf("Model structure created\n");
+    
+    if (load_model(global_model, model_path) != 0) {
+        printf("Model loading failed\n");
+        free_model(global_model);
+        global_model = NULL;
+        return;
+    }
+    printf("Prefetcher initialized successfully\n");
+}
+
 /*
  * This function is run before the page is fetched.
  * It can do prefetching based on non-page content related
@@ -297,20 +319,10 @@ unsigned long page_prefetch() {
  * after the currently faulted page is already fetched.
  */
 unsigned long page_postfetch() {
-   const char* model_path = "/data1/deku/models/random-ll-fltrace_xgboost_model.json";
-    printf("Post prefetch called\n"); 
-    // Initialize model
-    XGBoostModel* model = init_model();
-    if (!model) {
-	printf("Model not initialized\n");
-        return 1;
-    }
-    printf("Model initialized\n");
+    printf("Post prefetch called\n");
     
-    // Load model
-    if (load_model(model, model_path) != 0) {
-	printf("Model loading failed\n");
-        free_model(model);
+    if (!global_model || !global_model->is_loaded) {
+        printf("Model not initialized. Call init_prefetcher() first.\n");
         return 1;
     }
     
@@ -324,7 +336,7 @@ unsigned long page_postfetch() {
     };
     
     float prediction_prob;
-    if (predict_single(model, &test_features, &prediction_prob) == 0) {
+    if (predict_single(global_model, &test_features, &prediction_prob) == 0) {
         int prediction_binary = probability_to_prediction(prediction_prob);
         printf("Input: PC=0x%x, Offset=%d, Delta=%.2f, OffsetFromFaulting=%d\n",
                test_features.pc, test_features.offset, test_features.delta, 
@@ -348,7 +360,7 @@ unsigned long page_postfetch() {
     };
     
     float batch_predictions[5];
-    if (predict_batch(model, batch_features, batch_size, batch_predictions) == 0) {
+    if (predict_batch(global_model, batch_features, batch_size, batch_predictions) == 0) {
         printf("Batch predictions:\n");
         for (int i = 0; i < batch_size; i++) {
             int binary_pred = probability_to_prediction(batch_predictions[i]);
@@ -358,9 +370,6 @@ unsigned long page_postfetch() {
     } else {
         fprintf(stderr, "Batch prediction failed\n");
     }
-    
-    // Clean up
-    free_model(model);
     
     printf("\nInference completed successfully!\n");
     return 0;
