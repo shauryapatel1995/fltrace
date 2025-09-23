@@ -97,26 +97,13 @@ int load_model(XGBoostModel* model, const char* model_path) {
         return -1;
     }
     
-    // Set objective to avoid plugin loading issues in shared library
-    if (XGBoosterSetParam(model->booster, "objective", "binary:logistic") != 0) {
-        fprintf(stderr, "Failed to set objective parameter\n");
-        const char* error_msg = XGBGetLastError();
-        if (error_msg) {
-            fprintf(stderr, "XGBoost error: %s\n", error_msg);
-        }
-    }
-    
-    printf("Loading model (config: {\"validate_parameters\": \"0\"})\n");
-    // Disable parameter validation to avoid objective function check
-    XGBoosterSetParam(model->booster, "validate_parameters", "0");
-    
     // Load model from file
     if (XGBoosterLoadModel(model->booster, model_path) != 0) {
         printf("Loading failed\n");
         const char* error_msg = XGBGetLastError();
-        if (error_msg) {
+        //if (error_msg) {
             fprintf(stderr, "XGBoost error: %s\n", error_msg);
-        }
+        //}
         fprintf(stderr, "Failed to load model from %s\n", model_path);
         XGBoosterFree(model->booster);
         model->booster = NULL;
