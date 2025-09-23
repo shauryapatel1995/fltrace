@@ -12,6 +12,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <pthread.h>
+#include "rmem/common.h"
 #include "rmem/prefetch.h"
 
 // XGBoost C API
@@ -101,9 +102,9 @@ int load_model(XGBoostModel* model, const char* model_path) {
     if (XGBoosterLoadModel(model->booster, model_path) != 0) {
         printf("Loading failed\n");
         const char* error_msg = XGBGetLastError();
-        //if (error_msg) {
+        if (error_msg) {
             fprintf(stderr, "XGBoost error: %s\n", error_msg);
-        //}
+        }
         fprintf(stderr, "Failed to load model from %s\n", model_path);
         XGBoosterFree(model->booster);
         model->booster = NULL;
@@ -304,6 +305,7 @@ void free_model(XGBoostModel* model) {
 
 
 void init_prefetcher() {
+    RUNTIME_ENTER();
     const char* model_path = "/data1/deku/models/random-ll-fltrace_xgboost_model.json";
     
     pthread_mutex_lock(&model_init_lock);
@@ -312,6 +314,7 @@ void init_prefetcher() {
     if (global_model != NULL && global_model->is_loaded) {
         printf("Prefetcher already initialized\n");
         pthread_mutex_unlock(&model_init_lock);
+	RUNTIME_EXIT();
         return;
     }
     
@@ -321,6 +324,7 @@ void init_prefetcher() {
     if (!global_model) {
         printf("Model not initialized\n");
         pthread_mutex_unlock(&model_init_lock);
+	RUNTIME_EXIT();
         return;
     }
     printf("Model structure created\n");
@@ -330,11 +334,13 @@ void init_prefetcher() {
         free_model(global_model);
         global_model = NULL;
         pthread_mutex_unlock(&model_init_lock);
+	RUNTIME_EXIT();
         return;
     }
     printf("Prefetcher initialized successfully\n");
     
     pthread_mutex_unlock(&model_init_lock);
+    RUNTIME_EXIT();
 }
 
 /*

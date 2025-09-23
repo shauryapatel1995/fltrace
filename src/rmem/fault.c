@@ -312,7 +312,6 @@ void fault_done(fault_t* f)
 enum fault_status handle_page_fault(int chan_id, fault_t* fault, 
     int* nevicts_needed, struct bkend_completion_cbs* cbs)
 {
-    printf("Handle page fault\n");
     struct region_t* mr;
     bool page_present, was_locked, no_wake, wrprotect;
     int i, ret, n_retries, nchunks, noverflow;
@@ -325,6 +324,9 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
     assert(nevicts_needed);
     *nevicts_needed = 0;
 
+    /* init prefetcher state */
+    init_prefetcher();
+    
     /* see if this fault needs to be acted upon, because some other fault 
      * on the same page might have handled it by now */
     if (is_fault_serviced(fault, /*page locked=*/ false)) {
