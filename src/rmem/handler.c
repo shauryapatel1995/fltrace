@@ -60,7 +60,8 @@ static inline fault_t* read_uffd_fault()
     ssize_t read_size;
     struct uffd_msg message;
     struct fault* fault;
-    unsigned long long addr, flags;
+    unsigned long long faulting_addr, addr, flags;
+    unsigned long pc; 
     struct region_t* mr;
 
     struct pollfd evt = { .fd = userfault_fd, .events = POLLIN };
@@ -94,8 +95,10 @@ static inline fault_t* read_uffd_fault()
         }
 
         /* new fault */
-        addr = message.arg.pagefault.address;
+	faulting_addr = message.arg.pagefault.address;
+        addr = faulting_addr & (~(4096 - 1));
         flags = message.arg.pagefault.flags;
+	pc = message.arg.pagefault.pc;
         log_debug("uffd pagefault event %d: addr=%llx, flags=0x%llx",
             message.event, addr, flags);
 
@@ -135,8 +138,10 @@ static inline fault_t* read_uffd_fault()
             flags |= FSAMPLER_FAULT_FLAG_ZERO;
 
         /* record if sampling faults */
+	//XXX(shaurp): This doesn't work anymore because we updated userfaultfd
+	//to not report the process ID anymore.
         fsampler_add_fault_sample(my_hthr->fsampler_id, addr, flags,
-            message.arg.pagefault.feat.ptid);
+            0);
 #endif
 
         return fault;

@@ -18,6 +18,7 @@
 #include "rmem/pgnode.h"
 #include "rmem/stats.h"
 #include "rmem/uffd.h"
+#include "rmem/prefetch.h"
 
 /* fault handling common state */
 __thread void* zero_page = NULL;
@@ -311,6 +312,7 @@ void fault_done(fault_t* f)
 enum fault_status handle_page_fault(int chan_id, fault_t* fault, 
     int* nevicts_needed, struct bkend_completion_cbs* cbs)
 {
+    printf("Handle page fault\n");
     struct region_t* mr;
     bool page_present, was_locked, no_wake, wrprotect;
     int i, ret, n_retries, nchunks, noverflow;
@@ -361,6 +363,9 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
              * a lock on the next few pages that have similar requirements 
              * as the current page so we can make the same choices for them 
              * throughout the fault handling */
+	    // TODO(shaurp): Learn how to connect this prefetch to actually
+	    // prefetch the pages.
+	    page_prefetch();
             for (i = 1; i <= fault->rdahead_max; i++) {
                 addr = fault->page + i * CHUNK_SIZE;
                 if(!is_in_memory_region_unsafe(mr, addr))
@@ -419,6 +424,8 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
                 ret = set_page_flags_range(mr, fault->page, 
                     nchunks * CHUNK_SIZE, PFLAG_DIRTY);
                 assert(ret == nchunks);
+		// TODO(shaurp):Actually pass the features here.
+		page_postfetch();
                 return FAULT_DONE;
             }
             
