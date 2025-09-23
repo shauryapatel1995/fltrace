@@ -11,6 +11,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdint.h>
+#include <pthread.h>
 #include "rmem/prefetch.h"
 
 // XGBoost C API
@@ -33,6 +34,7 @@ typedef struct {
 } XGBoostModel;
 
 static XGBoostModel* global_model = NULL;
+static pthread_mutex_t model_init_lock = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct {
     uint32_t pc;
@@ -316,11 +318,22 @@ void free_model(XGBoostModel* model) {
 
 void init_prefetcher() {
     const char* model_path = "/data1/deku/models/random-ll-fltrace_xgboost_model.json";
+    
+    pthread_mutex_lock(&model_init_lock);
+    
+    // Check if already initialized
+    if (global_model != NULL && global_model->is_loaded) {
+        printf("Prefetcher already initialized\n");
+        pthread_mutex_unlock(&model_init_lock);
+        return;
+    }
+    
     printf("Initializing prefetcher...\n");
     
     global_model = init_model();
     if (!global_model) {
         printf("Model not initialized\n");
+        pthread_mutex_unlock(&model_init_lock);
         return;
     }
     printf("Model structure created\n");
@@ -329,9 +342,12 @@ void init_prefetcher() {
         printf("Model loading failed\n");
         free_model(global_model);
         global_model = NULL;
+        pthread_mutex_unlock(&model_init_lock);
         return;
     }
     printf("Prefetcher initialized successfully\n");
+    
+    pthread_mutex_unlock(&model_init_lock);
 }
 
 /*
