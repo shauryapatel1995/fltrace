@@ -12,6 +12,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <dlfcn.h>
 #include "rmem/common.h"
 #include "rmem/prefetch.h"
 
@@ -321,6 +322,14 @@ void init_prefetcher() {
         pthread_mutex_unlock(&model_init_lock);
 	RUNTIME_EXIT();
         return;
+    }
+    
+    // Force load XGBoost library with RTLD_GLOBAL to ensure static constructors run
+    void* xgboost_handle = dlopen("/usr/local/lib/libxgboost.so", RTLD_GLOBAL | RTLD_NOW);
+    if (!xgboost_handle) {
+        fprintf(stderr, "Failed to dlopen XGBoost: %s\n", dlerror());
+    } else {
+        printf("XGBoost library loaded with RTLD_GLOBAL\n");
     }
     
     printf("Initializing prefetcher...\n");
