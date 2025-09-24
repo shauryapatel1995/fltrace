@@ -6,7 +6,7 @@ CC	= gcc
 AR	= ar
 FLTRACE = fltrace.so
 #XGBOOST_INC = -I/usr/include/xgboost
-XGBOOST_LIBS = /usr/local/lib/libxgboost.a -lstdc++
+XGBOOST_LIBS = -L/usr/local/lib -lxgboost -Wl,-rpath=/usr/local/lib
 
 # Path and dir of this makefile
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -98,7 +98,7 @@ librmem.a: $(rmem_obj)
 # use "make fltrace.so"
 $(FLTRACE): $(main_obj) libs src/base/base.ld
 	$(LD) $(CFLAGS) $(LDFLAGS) -shared $(main_obj) -o $(FLTRACE)	\
-		librmem.a libbase.a $(JEMALLOC_STATIC_LIBS) -Wl,--whole-archive $(XGBOOST_LIBS) -Wl,--no-whole-archive -lpthread -lm -ldl -fopenmp 
+		librmem.a libbase.a $(JEMALLOC_STATIC_LIBS) $(XGBOOST_LIBS) -lpthread -lm -ldl 
 
 ## general build rules for all targets
 src = $(base_src) $(rmem_src) ${main_src}
