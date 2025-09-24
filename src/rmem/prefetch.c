@@ -324,14 +324,6 @@ void init_prefetcher() {
         return;
     }
     
-    // Force load XGBoost library with RTLD_GLOBAL to ensure static constructors run
-    void* xgboost_handle = dlopen("/usr/local/lib/libxgboost.so", RTLD_GLOBAL | RTLD_NOW);
-    if (!xgboost_handle) {
-        fprintf(stderr, "Failed to dlopen XGBoost: %s\n", dlerror());
-    } else {
-        printf("XGBoost library loaded with RTLD_GLOBAL\n");
-    }
-    
     printf("Initializing prefetcher...\n");
     
     global_model = init_model();

@@ -118,7 +118,7 @@ if [[ $COMMAND == "record" ]]; then
 
     # run command with fltrace
     rm -rf fltrace-data-*   # clean up old data
-    env LD_PRELOAD=${SCRIPT_DIR}/fltrace.so \
+    env LD_PRELOAD="/usr/local/lib/libxgboost.so:${SCRIPT_DIR}/fltrace.so" \
         FLTRACE_LOCAL_MEMORY_MB=${LOCAL_MEM_MB} \
         FLTRACE_MAX_MEMORY_MB=${MAX_MEM_MB} \
         FLTRACE_NHANDLERS=${NHANDLERS} \
