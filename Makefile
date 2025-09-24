@@ -6,7 +6,7 @@ CC	= gcc
 AR	= ar
 FLTRACE = fltrace.so
 #XGBOOST_INC = -I/usr/include/xgboost
-XGBOOST_LIBS = /usr/local/lib/libxgboost.a -lstdc++
+XGBOOST_LIBS = -L/usr/local/lib -lxgboost -Wl,-rpath=/usr/local/lib
 
 # Path and dir of this makefile
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
