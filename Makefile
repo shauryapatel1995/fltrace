@@ -98,7 +98,7 @@ librmem.a: $(rmem_obj)
 # use "make fltrace.so"
 $(FLTRACE): $(main_obj) libs src/base/base.ld
 	$(LD) $(CFLAGS) $(LDFLAGS) -shared $(main_obj) -o $(FLTRACE)	\
-		librmem.a libbase.a $(JEMALLOC_STATIC_LIBS) -Wl,--whole-archive $(XGBOOST_LIBS) -Wl,--no-whole-archive -lpthread -lm -ldl 
+		librmem.a libbase.a $(JEMALLOC_STATIC_LIBS) -Wl,--whole-archive $(XGBOOST_LIBS) -Wl,--no-whole-archive -lpthread -lm -ldl -fopenmp 
 
 ## general build rules for all targets
 src = $(base_src) $(rmem_src) ${main_src}
