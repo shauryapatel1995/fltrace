@@ -87,6 +87,11 @@ int load_model(XGBoostModel* model, const char* model_path) {
     fclose(test_file);
     printf("Model file exists and is readable: %s\n", model_path);
     
+    // Force XGBoost initialization
+    int major, minor, patch;
+    XGBoostVersion(&major, &minor, &patch);
+    printf("XGBoost version: %d.%d.%d\n", major, minor, patch);
+    
     printf("Creating booster\n");
     // Create booster
     if (XGBoosterCreate(NULL, 0, &model->booster) != 0) {
