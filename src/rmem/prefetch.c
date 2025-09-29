@@ -53,11 +53,30 @@ typedef struct {
     double recall;
     double accuracy;
 } PredictionMetrics;
+#define XGBOOST_LIB_PATH "/usr/local/lib/libxgboost.so"
+
+__attribute__((constructor))
+void xgboost_pre_init(void) {
+    // Attempt to open libxgboost.so. RTLD_NOW forces immediate resolution of all
+    // symbols, and the act of dlopen() is what triggers the static constructors
+    // of libxgboost.so to run.
+    void *handle = dlopen(XGBOOST_LIB_PATH, RTLD_NOW | RTLD_GLOBAL);
+    
+    if (!handle) {
+        // Log a fatal error if the library cannot be loaded/initialized
+        fprintf(stderr, "FATAL ERROR: Failed to explicitly dlopen and initialize libxgboost.so at %s\n", XGBOOST_LIB_PATH);
+        fprintf(stderr, "dlerror: %s\n", dlerror());
+        exit(1); // Exit, as the model loading will certainly fail.
+    }
+    fprintf(stdout, "Done with the dlopen\n");  
+    // dlclose(handle); // Do NOT close the handle if you intend to use the functions later.
+}
 
 /**
  * Initialize XGBoost model structure
  */
 XGBoostModel* init_model() {
+    xgboost_pre_init();
     XGBoostModel* model = (XGBoostModel*)malloc(sizeof(XGBoostModel));
     if (!model) {
         fprintf(stderr, "Failed to allocate memory for model\n");
@@ -104,6 +123,7 @@ int load_model(XGBoostModel* model, const char* model_path) {
         return -1;
     }
     
+    fprintf(stdout, "Loading model\n");
     // Load model from file
     if (XGBoosterLoadModel(model->booster, model_path) != 0) {
         printf("Loading failed\n");
@@ -311,7 +331,6 @@ void free_model(XGBoostModel* model) {
 
 
 void init_prefetcher() {
-    RUNTIME_ENTER();
     const char* model_path = "/data1/deku/models/random-ll-fltrace_xgboost_model.json";
     
     pthread_mutex_lock(&model_init_lock);
@@ -320,7 +339,6 @@ void init_prefetcher() {
     if (global_model != NULL && global_model->is_loaded) {
         printf("Prefetcher already initialized\n");
         pthread_mutex_unlock(&model_init_lock);
-	RUNTIME_EXIT();
         return;
     }
     
@@ -330,7 +348,6 @@ void init_prefetcher() {
     if (!global_model) {
         printf("Model not initialized\n");
         pthread_mutex_unlock(&model_init_lock);
-	RUNTIME_EXIT();
         return;
     }
     printf("Model structure created\n");
@@ -340,13 +357,11 @@ void init_prefetcher() {
         free_model(global_model);
         global_model = NULL;
         pthread_mutex_unlock(&model_init_lock);
-	RUNTIME_EXIT();
         return;
     }
     printf("Prefetcher initialized successfully\n");
     
     pthread_mutex_unlock(&model_init_lock);
-    RUNTIME_EXIT();
 }
 
 /*

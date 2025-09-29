@@ -1,8 +1,9 @@
 INC     = -I./src/inc
 CFLAGS  = -g -Wall -std=gnu11 -D_GNU_SOURCE $(INC) -mssse3 -I/data1/linux/usr/include
 LDFLAGS = -T src/base/base.ld -no-pie
-LD	= gcc
+LD	= g++
 CC	= gcc
+PREFETCH_LL = g++
 AR	= ar
 FLTRACE = fltrace.so
 #XGBOOST_INC = -I/usr/include/xgboost
@@ -98,7 +99,8 @@ librmem.a: $(rmem_obj)
 # use "make fltrace.so"
 $(FLTRACE): $(main_obj) libs src/base/base.ld
 	$(LD) $(CFLAGS) $(LDFLAGS) -shared $(main_obj) -o $(FLTRACE)	\
-		librmem.a libbase.a $(JEMALLOC_STATIC_LIBS) $(XGBOOST_LIBS) -lpthread -lm -ldl 
+		librmem.a libbase.a $(JEMALLOC_STATIC_LIBS) \
+	        -Wl,--whole-archive -lxgboost -Wl,--no-whole-archive -lstdc++ -lpthread -lm -ldl 
 
 ## general build rules for all targets
 src = $(base_src) $(rmem_src) ${main_src}

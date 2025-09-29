@@ -125,6 +125,7 @@ static inline fault_t* read_uffd_fault()
         BUG_ON(!mr);  /* we dont do region deletions yet so it must exist */
         assert(mr->addr);
         fault->mr = mr;
+	printf("New uffd fault\n");
 
 #ifdef FAULT_SAMPLER
         /* check if this is the first fault on the page; there may be many 
@@ -140,8 +141,8 @@ static inline fault_t* read_uffd_fault()
         /* record if sampling faults */
 	//XXX(shaurp): This doesn't work anymore because we updated userfaultfd
 	//to not report the process ID anymore.
-        fsampler_add_fault_sample(my_hthr->fsampler_id, addr, flags,
-            0);
+        //fsampler_add_fault_sample(my_hthr->fsampler_id, addr, flags,
+        //    0);
 #endif
 
         return fault;
@@ -243,6 +244,7 @@ static void* rmem_handler(void *arg)
                 &nevicts_needed, &hthr_cbs);
             switch (fstatus) {
                 case FAULT_DONE:
+		    fprintf(stdout, "Fault handling completed\n");
                     fault_done(fault);
                     break;
                 case FAULT_IN_PROGRESS:
@@ -285,6 +287,7 @@ eviction:
                 if (nevicts_needed > 0) 
                     batch = EVICTION_MAX_BATCH_SIZE;
                 nevicts += do_eviction(my_hthr->bkend_chan_id, &hthr_cbs, batch);
+		fprintf(stdout, "Evicting\n");
             } while(nevicts < nevicts_needed);
             work_done = true;
         }
