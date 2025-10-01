@@ -38,21 +38,6 @@ typedef struct {
 static XGBoostModel* global_model = NULL;
 static pthread_mutex_t model_init_lock = PTHREAD_MUTEX_INITIALIZER;
 
-typedef struct {
-    uint32_t pc;
-    int offset;
-    float delta;
-    int offset_from_faulting;
-} FeatureVector;
-
-typedef struct {
-    int cache_hit;
-    int cache_miss; 
-    int misprefetch;
-    double precision;
-    double recall;
-    double accuracy;
-} PredictionMetrics;
 #define XGBOOST_LIB_PATH "/usr/local/lib/libxgboost.so"
 
 __attribute__((constructor))
@@ -369,7 +354,7 @@ void init_prefetcher() {
  * It can do prefetching based on non-page content related
  * information.
  */
-unsigned long page_prefetch() {
+unsigned long page_prefetch(FeatureVector features[]) {
 
 }
 
@@ -378,49 +363,37 @@ unsigned long page_prefetch() {
  * contents are accessible. It fetches additional pages
  * after the currently faulted page is already fetched.
  */
-unsigned long page_postfetch() {
-    printf("Post prefetch called\n");
+unsigned long page_postfetch(FeatureVector features[]) {
     
     if (!global_model || !global_model->is_loaded) {
         printf("Model not initialized. Call init_prefetcher() first.\n");
         return 1;
     }
-    
-    // Example: Single prediction
-    printf("\n=== Single Prediction Example ===\n");
-    FeatureVector test_features = {
-        .pc = 0x50c9f0,
-        .offset = 0,
-        .delta = 1024.0f,
-        .offset_from_faulting = 64
-    };
-    
-    float prediction_prob;
-    if (predict_single(global_model, &test_features, &prediction_prob) == 0) {
-        int prediction_binary = probability_to_prediction(prediction_prob);
-        printf("Input: PC=0x%x, Offset=%d, Delta=%.2f, OffsetFromFaulting=%d\n",
-               test_features.pc, test_features.offset, test_features.delta, 
-               test_features.offset_from_faulting);
-        printf("Prediction probability: %.6f\n", prediction_prob);
-        printf("Binary prediction: %d (%s)\n", prediction_binary, 
-               prediction_binary ? "Cache Hit" : "Cache Miss");
-    } else {
-        fprintf(stderr, "Single prediction failed\n");
+    /*
+    // Debug features
+    for(int i = 0; i < 600; i++) { 
+	    fprintf(stdout, "During prefetch: %lu, %f, %lu, %lu\n", features[i].pc, features[i].delta, features[i].offset, features[i].offset_from_faulting);
+    } */
+    for(int i = 0; i < 600; i++) {
+	    float prediction_prob;
+	    if (predict_single(global_model, &features[i], &prediction_prob) == 0) {
+		int prediction_binary = probability_to_prediction(prediction_prob);
+		if (prediction_binary) {
+	    		fprintf(stdout, "During prefetch: %lu, %f, %lu, %lu\n", features[i].pc, features[i].delta, features[i].offset, features[i].offset_from_faulting);
+			printf("Prediction probability: %.6f\n", prediction_prob);
+			printf("Binary prediction: %d (%s)\n", prediction_binary, 
+			       prediction_binary ? "Cache Hit" : "Cache Miss");
+		}
+	    } else {
+		fprintf(stderr, "Single prediction failed\n");
+	    }
     }
-    
-    // Example: Batch prediction
-    printf("\n=== Batch Prediction Example ===\n");
-    const int batch_size = 5;
-    FeatureVector batch_features[5] = {
-        {0x50c9f0, 0, 1024.0f, 64},
-        {0x50c9f0, 16, 2048.0f, 32},
-        {0x50c9f0, -8, 512.0f, 128},
-        {0x50c9f0, 32, 4096.0f, 16},
-        {0x50c9f0, 8, 256.0f, 256}
-    };
-    
-    float batch_predictions[5];
-    if (predict_batch(global_model, batch_features, batch_size, batch_predictions) == 0) {
+
+    // TODO(shaurp): The following code gets stuck, figure out if there is a bug
+    // in xgboost.
+    /* 
+    float batch_predictions[50];
+    if (predict_batch(global_model, features, batch_size, batch_predictions) == 0) {
         printf("Batch predictions:\n");
         for (int i = 0; i < batch_size; i++) {
             int binary_pred = probability_to_prediction(batch_predictions[i]);
@@ -430,7 +403,7 @@ unsigned long page_postfetch() {
     } else {
         fprintf(stderr, "Batch prediction failed\n");
     }
-    
+    */
     printf("\nInference completed successfully!\n");
     return 0;
 }

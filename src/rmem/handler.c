@@ -112,6 +112,8 @@ static inline fault_t* read_uffd_fault()
         /* populate it */
         memset(fault, 0, sizeof(fault_t));
         fault->page = addr & ~CHUNK_MASK;
+	fault->pc = pc;
+	fault->faulting_addr = addr;
         fault->is_wrprotect = !!(flags & UFFD_PAGEFAULT_FLAG_WP);
         fault->is_write = !!(flags & UFFD_PAGEFAULT_FLAG_WRITE);
         fault->is_read = !(fault->is_write || fault->is_wrprotect);
@@ -125,7 +127,6 @@ static inline fault_t* read_uffd_fault()
         BUG_ON(!mr);  /* we dont do region deletions yet so it must exist */
         assert(mr->addr);
         fault->mr = mr;
-	printf("New uffd fault\n");
 
 #ifdef FAULT_SAMPLER
         /* check if this is the first fault on the page; there may be many 

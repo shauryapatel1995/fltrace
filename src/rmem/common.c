@@ -101,6 +101,8 @@ int rmem_common_init(
     /* init lru lists and other eviction state */
     eviction_init();
 
+    /* Initialize prefetching data structures */
+    prefetch_init();
 
 #ifdef FAULT_SAMPLER
     /* init fault samplers */

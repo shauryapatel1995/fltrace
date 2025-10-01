@@ -39,12 +39,14 @@ typedef struct fault {
 
     /* associated resources */
     unsigned long page;
+    uint64_t faulting_addr;     /* actual faulting addr */
+    uint64_t pc;                /* faulting pc */
     struct region_t* mr;
     void* bkend_buf;
     unsigned long tstamp_tsc;
     uint32_t unused3;
-
-	struct list_node link;
+    struct list_node link;
+    uint8_t cacheline_padding[128 - 80]; // 48 bytes of padding
 } fault_t;
 BUILD_ASSERT(sizeof(fault_t) % CACHE_LINE_SIZE == 0);
 BUILD_ASSERT(FAULT_MAX_RDAHEAD_SIZE <= UINT8_MAX);   /* due to rdahead */
@@ -74,6 +76,8 @@ int fault_tcache_init();
 void fault_tcache_init_thread();
 bool fault_is_node_valid(struct fault* f);
 void fault_tcache_destroy(void);
+void prefetch_init(void);
+
 
 /* fault_alloc - allocates a fault object */
 static inline fault_t *fault_alloc(void)
