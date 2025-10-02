@@ -15,9 +15,16 @@
 #include <dlfcn.h>
 #include "rmem/common.h"
 #include "rmem/prefetch.h"
-
-
-
+/*
+ * Implementation to do the actual prefetching with predictions from a
+ * prefetching policy. The function does the following - 
+ * 1. Constructs the required input for a prefetching policy.
+ * 2. Obtains predictions from a given policy.
+ * 3. Converts predictions to addresses to prefetch
+ * 4. Checks whether the page for an address can be prefetched.
+ * 5. Prefetches the page, and updates the eviction count to reflect 
+ * the additional pages.
+*/
 unsigned long page_postfetch(fault_t * f, FeatureVector *features, int *responses) {
     // TODO(shaurp): Confirm the accuracy of the following calculations.
     uint64_t *ptr = f->page;
@@ -40,25 +47,31 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features, int *response
     } 
     page_postfetch_preds(features, responses);
     
-    /* TODO(shaurp):
-     * 1. Read or generate address value.
-    */
+    /* 
+     * 1. Generate address value.
+     * 2. Do the same checks as the ones in readahead plus walking
+     * the page table. 
+     */
     for (int i = 0; i < 512; i++) {
 	if (responses[i] == 0)
 		continue;
         uint64_t ptr_val = *((uint64_t *) f->page + i); 
-        fprintf(stdout, "Prefetch address: %lu\n", ptr_val);
+        if(is_page_prefetchable(f, ptr_val))
+            fprintf(stdout, "Prefetch address: %lu\n", ptr_val);
     }
 
     for (int i = 0; i < 512; i++) {
 	if (responses[i] == 0)
 		continue;
         uint64_t ptr_val =  f->page + (i - 512); 
-        fprintf(stdout, "Prefetch address: %lu\n", ptr_val);
+        if(is_page_prefetchable(f, ptr_val))
+            fprintf(stdout, "Prefetch address: %lu\n", ptr_val);
     }
     /*
      * 2. Do the same checks as the ones in readahead plus walking
      * the page table. 
+     */
+    /*
      * 3. Call local post read on the address after making a fault?
      * Or decide on a design for local post read.
      * 4. Call fault_read_done for the page.

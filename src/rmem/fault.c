@@ -109,7 +109,44 @@ bool is_fault_serviced(fault_t* f, bool locked)
     }
     return false;
 }
+/*
+ * Check whether a page is prefetchable
+ * Locks the page if it is prefetchable.
+ */
+bool is_page_prefetchable(fault_t *f, unsigned long addr) {
+    struct region_t* mr;
+    bool was_locked;
+    pgflags_t oldflags, rflags;
 
+    if(!is_in_memory_region_unsafe(mr, addr))
+	    return false;
+
+	/* See if the page is already present 
+     * XXX(shaurp): Confirm if the other requriments from
+     * fault_can_rdahead are necessary for us.
+     */
+	rflags = get_page_flags(mr, addr);
+	if (rflags & PFLAG_PRESENT)
+	    return false;
+
+	/* try locking */
+	rflags = set_page_flags(mr, addr, PFLAG_WORK_ONGOING, &oldflags);
+	was_locked = !!(oldflags & PFLAG_WORK_ONGOING);
+	if (was_locked) 
+	    return false;
+
+	/* check again after locking */
+	if (unlikely(rflags & PFLAG_PRESENT)) {
+	    /* this shouldn't happen unless there is an extreme race;
+	     * someone locked the page, changed its state and released
+	     * it all in between our earlier check and taking a lock */
+	    clear_page_flags(mr, addr, PFLAG_WORK_ONGOING, &oldflags);
+	    assert(!!(oldflags & PFLAG_WORK_ONGOING));
+	    return false;
+	}
+    return true;
+             
+}
 /* checks if a page is in the same state as the faulting page to batch it 
  * together as a part of rdahead. this function only checks page flags and 
  * assumes that page locations relative to each other are already evaluated 
@@ -298,8 +335,6 @@ int fault_read_done(fault_t* f)
 
 /* Called after servicing fault is completely done: removes lock on the page 
  * and frees temporary resources */
-// TODO(shaurp): Read and update the nevicts needed here.
-// Also do the actual prefetching?
 void fault_done(fault_t* f)
 {
     int i, r;
@@ -308,6 +343,7 @@ void fault_done(fault_t* f)
  
     /* Perform the actual prefetching backend implementation */
     page_postfetch(f, &features, &responses);
+
     /* remove lock (in ascending order) */
     if (f->locked_pages) {
         for (i = 0; i <= f->rdahead; i++)
@@ -399,7 +435,7 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
              * a lock on the next few pages that have similar requirements 
              * as the current page so we can make the same choices for them 
              * throughout the fault handling */
-	    //page_prefetch(features, &responses);
+	        //page_prefetch(features, &responses);
             for (i = 1; i <= fault->rdahead_max; i++) {
                 addr = fault->page + i * CHUNK_SIZE;
                 if(!is_in_memory_region_unsafe(mr, addr))
