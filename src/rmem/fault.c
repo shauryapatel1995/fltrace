@@ -28,6 +28,7 @@ __thread unsigned int n_wait_q;
 __thread struct list_head fault_wait_q;
 
 __thread FeatureVector features[600];
+__thread int responses[600];
 
 
 /*
@@ -304,38 +305,9 @@ void fault_done(fault_t* f)
     int i, r;
     pgthread_t owner_kthr;
     pgflags_t oldflags;
-    // TODO(shaurp): Confirm the accuracy of the following calculations.
-    uint64_t *ptr = f->page;
-    int faulting_location = (f->faulting_addr - f->page) / sizeof(uint64_t);
-    /* Setup pointer features */
-    for(int i = 0; i < 512; i++, ptr++) {
-	FeatureVector *feature = &features[i];
-	feature->pc = f->pc;
-	feature->offset = i;
-	feature->delta = (*ptr - f->page) / 4096;
-	feature->offset_from_faulting = i - faulting_location;
-    }
-    /* Setup next-N features */
-    for (int i = 512; i < 600; i++) {
-	FeatureVector *feature = &features[i];
-	feature->pc = f->pc;
-	feature->offset = 0; 
-	feature->delta = i - 512; 
-	feature->offset_from_faulting = 0;
-    } 
-    page_postfetch(features);
-    
-    /* TODO(shaurp):
-     * 1. Read or generate address value.
-     * 2. Do the same checks as the ones in readahead plus walking
-     * the page table. 
-     * 3. Call local post read on the address after making a fault?
-     * Or decide on a design for local post read.
-     * 4. Call fault_read_done for the page.
-     * 5. Calculate/update nevict for the prefetched pages. 
-     * 6. clear the pages after fetching is done.
-     */ 
-
+ 
+    /* Perform the actual prefetching backend implementation */
+    page_postfetch(f, &features, &responses);
     /* remove lock (in ascending order) */
     if (f->locked_pages) {
         for (i = 0; i <= f->rdahead; i++)
@@ -376,7 +348,7 @@ void fault_done(fault_t* f)
 enum fault_status handle_page_fault(int chan_id, fault_t* fault, 
     int* nevicts_needed, struct bkend_completion_cbs* cbs)
 {
-    printf("Handle page fault\n");
+    printf("Page fault addr: %lu\n", fault->page);
     struct region_t* mr;
     bool page_present, was_locked, no_wake, wrprotect;
     int i, ret, n_retries, nchunks, noverflow;
@@ -410,7 +382,6 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
             return FAULT_IN_PROGRESS;
         }
         else {
-	    fprintf(stdout, "Handling page fault");
             /* locked; we are handling it */
             nchunks = 1;
             fault->locked_pages = true;
@@ -428,7 +399,7 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
              * a lock on the next few pages that have similar requirements 
              * as the current page so we can make the same choices for them 
              * throughout the fault handling */
-	    page_prefetch(features);
+	    //page_prefetch(features, &responses);
             for (i = 1; i <= fault->rdahead_max; i++) {
                 addr = fault->page + i * CHUNK_SIZE;
                 if(!is_in_memory_region_unsafe(mr, addr))

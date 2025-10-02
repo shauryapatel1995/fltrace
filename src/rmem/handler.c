@@ -245,7 +245,6 @@ static void* rmem_handler(void *arg)
                 &nevicts_needed, &hthr_cbs);
             switch (fstatus) {
                 case FAULT_DONE:
-		    fprintf(stdout, "Fault handling completed\n");
                     fault_done(fault);
                     break;
                 case FAULT_IN_PROGRESS:
