@@ -135,7 +135,9 @@ bool is_page_prefetchable(fault_t *f, unsigned long addr) {
 	if (was_locked) 
 	    return false;
 
-	/* check again after locking */
+	/* check page_present again after locking
+     * XXX(shaurp): Do we need to do fault_can_rdahead?
+     */ 
 	if (unlikely(rflags & PFLAG_PRESENT)) {
 	    /* this shouldn't happen unless there is an extreme race;
 	     * someone locked the page, changed its state and released
