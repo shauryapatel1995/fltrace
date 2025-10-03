@@ -147,8 +147,7 @@ bool is_page_prefetchable(fault_t *f, unsigned long addr) {
 	    assert(!!(oldflags & PFLAG_WORK_ONGOING));
 	    return false;
 	}
-    return true;
-             
+    return true;        
 }
 /* checks if a page is in the same state as the faulting page to batch it 
  * together as a part of rdahead. this function only checks page flags and 
