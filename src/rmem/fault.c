@@ -118,6 +118,7 @@ bool is_page_prefetchable(fault_t *f, unsigned long addr) {
     bool was_locked;
     pgflags_t oldflags, rflags;
 
+    mr = f->mr;
     if(!is_in_memory_region_unsafe(mr, addr))
 	    return false;
 

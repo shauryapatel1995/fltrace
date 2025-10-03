@@ -28,6 +28,7 @@
 unsigned long page_postfetch(fault_t * f, FeatureVector *features, int *responses) {
     // TODO(shaurp): Confirm the accuracy of the following calculations.
     uint64_t *ptr = f->page;
+    int num_prefetches = 0;
     int faulting_location = (f->faulting_addr - f->page) / sizeof(uint64_t);
     /* Setup pointer features */
     for(int i = 0; i < 512; i++, ptr++) {
@@ -53,30 +54,30 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features, int *response
      * the page table. 
      */
     for (int i = 0; i < 512; i++) {
-	if (responses[i] == 0)
-		continue;
+	    if (responses[i] == 0)
+		    continue;
         uint64_t ptr_val = *((uint64_t *) f->page + i); 
         if(is_page_prefetchable(f, ptr_val))
             fprintf(stdout, "Prefetch address: %lu\n", ptr_val);
     }
 
     for (int i = 0; i < 512; i++) {
-	if (responses[i] == 0)
-		continue;
+	    if (responses[i] == 0)
+		    continue;
         uint64_t ptr_val =  f->page + (i - 512); 
         if(is_page_prefetchable(f, ptr_val))
             fprintf(stdout, "Prefetch address: %lu\n", ptr_val);
     }
     /*
-     * 2. Do the same checks as the ones in readahead plus walking
-     * the page table. 
-     */
-    /*
      * 3. Call local post read on the address after making a fault?
      * Or decide on a design for local post read.
+     */
+
+    /*
      * 4. Call fault_read_done for the page.
      * 5. Calculate/update nevict for the prefetched pages. 
      * 6. clear the pages after fetching is done.
      */ 
-
+    assert(num_prefetches > 0);
+    
 }
