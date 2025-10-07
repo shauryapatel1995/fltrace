@@ -123,6 +123,6 @@ struct bkend_completion_cbs;
 enum fault_status handle_page_fault(int chan_id, fault_t* fault, int* nevicts, 
     struct bkend_completion_cbs* cbs);
 int fault_read_done(fault_t* f);
-void fault_done(fault_t* fault, int chan_id);
+void fault_done(fault_t* fault, int chan_id, int *nevicts_needed);
 
 #endif    // __FAULT_H__

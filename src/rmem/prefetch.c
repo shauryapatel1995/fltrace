@@ -15,6 +15,7 @@
 #include <dlfcn.h>
 #include "rmem/common.h"
 #include "rmem/prefetch.h"
+#include "rmem/page.h"
 #include <sys/time.h>                
 
 /*
@@ -28,16 +29,22 @@
  * the additional pages.
 */
 unsigned long page_postfetch(fault_t * f, FeatureVector *features, 
-                                int *responses, int chan_id) {
+                                int *responses, int chan_id, int *nevicts_needed)
+{
     // TODO(shaurp): Confirm the accuracy of the following calculations.
 #ifdef benchmark_model
     struct timeval t1, t2;
     double elapsed_time;
 #endif
-    uint64_t *ptr = f->page;
     void *local_addr = bkend_buf_alloc();
-    int num_prefetches = 0;
+    pgthread_t owner_kthr;
+    pgflags_t oldflags;
+    int num_prefetches = 0, n_retries, nchunks, noverflow;
+    enum fault_status status;
+    unsigned long long pressure;
+    uint64_t *ptr = f->page;
     int faulting_location = (f->faulting_addr - f->page) / sizeof(uint64_t);
+
     /* Setup pointer features */
     for(int i = 0; i < 512; i++, ptr++) {
 	FeatureVector *feature = &features[i];
@@ -73,6 +80,7 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
      * 3. Call local post read on the address after making a fault?
      * Or decide on a design for local post read.
      * 4. Call fault_read_done for the page.
+     * 7. clear the pages after fetching is done.
      */
     for (int i = 0; i < 512; i++) {
 	    if (responses[i] == 0)
@@ -86,6 +94,19 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
                 goto out; 
             }
             prefetch_read_done(ptr_val, local_addr, f);
+            num_prefetches++;
+            clear_page_flags_and_thread(f->mr, ptr_val, 
+                PFLAG_WORK_ONGOING, &oldflags, &owner_kthr);
+            
+            /* check that the page was locked and that the saved kthread thread id
+            * (if this fault was originally from a kthread) is same or different 
+            * the from current kthread id depending on if the fault was stolen */
+            assert(!!(oldflags & PFLAG_WORK_ONGOING));
+            if (owner_kthr) {
+                assert(f->stolen_from_cq || owner_kthr == current_kthread_id);
+                assert(!f->stolen_from_cq || owner_kthr != current_kthread_id);
+            }
+
         }
     }
 
@@ -101,6 +122,18 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
                 goto out; 
             }
             prefetch_read_done(ptr_val, local_addr, f);
+            num_prefetches++;
+            clear_page_flags_and_thread(f->mr, ptr_val, 
+                PFLAG_WORK_ONGOING, &oldflags, &owner_kthr);
+            /* check that the page was locked and that the saved kthread thread id
+            * (if this fault was originally from a kthread) is same or different 
+            * the from current kthread id depending on if the fault was stolen */
+            assert(!!(oldflags & PFLAG_WORK_ONGOING));
+            if (owner_kthr) {
+                assert(f->stolen_from_cq || owner_kthr == current_kthread_id);
+                assert(!f->stolen_from_cq || owner_kthr != current_kthread_id);
+            }
+
         }
     }
    
@@ -108,9 +141,27 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
      * 5. Unmap the pages from the kernel, mark the page as prefetched
      * in our data structures (Complete after the entire workflow is done).
      * 6. Calculate/update nevict for the prefetched pages. 
-     * 7. clear the pages after fetching is done.
      */ 
 
+    assert(nevicts_needed);
+    /* book some memory for the pages */
+    if (num_prefetches > 0) {
+        assert(num_prefetches > 0);
+        pressure = atomic64_add_and_fetch(&memory_used, num_prefetches * CHUNK_SIZE);
+        log_debug("%s - memory pressure during prefetch %llu, limit %lu", FSTR(f), 
+            pressure, local_memory);
+        if (pressure > local_memory) {
+            noverflow = (pressure - local_memory) / CHUNK_SIZE;
+            *nevicts_needed = (noverflow < nchunks) ? noverflow : nchunks;
+        }
+
+        /* update maximum memory usage counter. FIXME: should use CAS! */
+        if (pressure > atomic64_read(&max_memory_used))
+            atomic64_write(&max_memory_used, pressure);
+
+        log_debug("%s - %d page(s) prefetched with return status %d, pressure %llu"
+            " evicts %d", FSTR(f), nchunks, status, pressure, *nevicts_needed);
+    }
 out: 
     bkend_buf_free(local_addr);
     return 0; 

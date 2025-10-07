@@ -187,6 +187,49 @@ int __always_inline get_highest_evict_gen(void)
     return 0;
 }
 
+/* after the prefetched pages have been uffd-copied into the 
+ * address space, we must allocate new page node to track them and add the 
+ * nodes to the eviction lists */
+static inline void prefetch_alloc_page_nodes(unsigned long addr, fault_t* f)
+{
+    int i, prio;
+    struct rmpage_node* pgnode;
+    struct list_head new;
+    struct page_list* evict_gen;
+    pgidx_t pgidx;
+
+    /* prio level */
+    prio = f->evict_prio;
+    assert(prio >= 0 && prio < evict_nprio);
+
+    /* newly fetched pages - alloc page nodes (for both the base page and 
+     * the read-ahead) */
+    list_head_init(&new);
+    /* get a page node */
+    pgnode = rmpage_node_alloc();
+    assert(pgnode);
+
+    /* each page node gets an MR reference too which gets removed 
+     * when the page is evicted out */
+    __get_mr(f->mr);
+    pgnode->mr = f->mr;
+    pgnode->addr = addr;
+    pgnode->evict_prio = prio;
+    list_add_tail(&new, &pgnode->link);
+
+    pgidx = rmpage_get_node_id(pgnode);
+    pgidx = set_page_index(pgnode->mr, pgnode->addr, pgidx);
+    assertz(pgidx); /* old index must be 0 */
+
+   /* XXX(shaurp): For now we don't support eviction DNE. */
+   /* add new pages to highest evict list */
+    evict_gen = &evict_gens[get_highest_evict_gen()];
+    spin_lock(&evict_gen->lock);
+    list_append_list(&evict_gen->pages[prio], &new);
+    evict_gen->npages += 1;
+    spin_unlock(&evict_gen->lock);
+}
+
 /* after the faulting page (and read-ahead) has been uffd-copied into the 
  * address space, we must allocate new page nodes to track them and add the 
  * nodes to the eviction lists */
@@ -326,8 +369,7 @@ int prefetch_read_done(void *bkend_buf, unsigned long addr, fault_t *f) {
     set_page_flags_range(f->mr, addr, size, flags);
 
     /* add page nodes for the pages */
-    // XXX(shaurp): We need to redo this.
-    // fault_alloc_page_nodes(f);
+    prefetch_alloc_page_nodes(addr, f);
 
     return 0;
 }
@@ -367,14 +409,14 @@ int fault_read_done(fault_t* f)
 
 /* Called after servicing fault is completely done: removes lock on the page 
  * and frees temporary resources */
-void fault_done(fault_t* f, int chan_id)
+void fault_done(fault_t* f, int chan_id, int *nevicts_needed)
 {
     int i, r;
     pgthread_t owner_kthr;
     pgflags_t oldflags;
  
     /* Perform the actual prefetching backend implementation */
-    page_postfetch(f, &features, &responses, chan_id);
+    page_postfetch(f, &features, &responses, chan_id, nevicts_needed);
 
     /* remove lock (in ascending order) */
     if (f->locked_pages) {

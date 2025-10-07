@@ -45,12 +45,13 @@ bool does_fault_exist_in_wait_q(struct fault *fault)
 /* called after fetched pages are ready on handler read completions */
 int hthr_fault_read_done(fault_t* f)
 {
-    int r;
+    int r, nevicts;
     r = fault_read_done(f);
     assertz(r);
 
     /* release fault */
-    fault_done(f, my_hthr->bkend_chan_id);
+    fault_done(f, my_hthr->bkend_chan_id, &nevicts);
+    assert(nevicts < 1);
     return 0;
 }
 
@@ -207,7 +208,7 @@ static void* rmem_handler(void *arg)
                     list_del_from(&my_hthr->fault_wait_q, &fault->link);
                     assert(my_hthr->n_wait_q > 0);
                     my_hthr->n_wait_q--;
-                    fault_done(fault, my_hthr->bkend_chan_id);
+                    fault_done(fault, my_hthr->bkend_chan_id, &nevicts_needed);
                     work_done = true;
                     break;
                 case FAULT_READ_POSTED:
@@ -245,7 +246,7 @@ static void* rmem_handler(void *arg)
                 &nevicts_needed, &hthr_cbs);
             switch (fstatus) {
                 case FAULT_DONE:
-                    fault_done(fault, my_hthr->bkend_chan_id);
+                    fault_done(fault, my_hthr->bkend_chan_id, &nevicts_needed);
                     break;
                 case FAULT_IN_PROGRESS:
                     /* handler thread should not see duplicate faults as we 
@@ -287,7 +288,6 @@ eviction:
                 if (nevicts_needed > 0) 
                     batch = EVICTION_MAX_BATCH_SIZE;
                 nevicts += do_eviction(my_hthr->bkend_chan_id, &hthr_cbs, batch);
-		fprintf(stdout, "Evicting\n");
             } while(nevicts < nevicts_needed);
             work_done = true;
         }
