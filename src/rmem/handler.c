@@ -50,7 +50,7 @@ int hthr_fault_read_done(fault_t* f)
     assertz(r);
 
     /* release fault */
-    fault_done(f);
+    fault_done(f, my_hthr->bkend_chan_id);
     return 0;
 }
 
@@ -207,7 +207,7 @@ static void* rmem_handler(void *arg)
                     list_del_from(&my_hthr->fault_wait_q, &fault->link);
                     assert(my_hthr->n_wait_q > 0);
                     my_hthr->n_wait_q--;
-                    fault_done(fault);
+                    fault_done(fault, my_hthr->bkend_chan_id);
                     work_done = true;
                     break;
                 case FAULT_READ_POSTED:
@@ -245,7 +245,7 @@ static void* rmem_handler(void *arg)
                 &nevicts_needed, &hthr_cbs);
             switch (fstatus) {
                 case FAULT_DONE:
-                    fault_done(fault);
+                    fault_done(fault, my_hthr->bkend_chan_id);
                     break;
                 case FAULT_IN_PROGRESS:
                     /* handler thread should not see duplicate faults as we 

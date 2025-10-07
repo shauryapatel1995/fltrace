@@ -175,12 +175,91 @@ int local_free_region(struct region_t *reg)
     return 0;
 }
 
-/* post read on a channel */
-int local_post_read(int chan_id, fault_t* f)
-{
+/* post read on channel for a prefetched page */
+int local_post_read_prefetch(int chan_id, fault_t *f, 
+                    unsigned long addr, void *bkend_buf) {
     struct local_channel* chan;
     unsigned long remote_addr, offset;
-    void* local_addr;
+    size_t size;
+    int req_id, cq_id;
+    
+    /* get channel */
+    log_debug("%s - posting read", addr);
+    assert(chan_id >= 0 && chan_id < nchans_bkend);
+    chan = channels[chan_id];
+
+    /* do we have a free slot? */
+    req_id = chan->read_req_idx;
+    assert(req_id >= 0 && req_id < MAX_R_REQS_PER_CHAN);
+    if (load_acquire(&chan->read_reqs[req_id].busy))
+        /* all slots busy, try again */
+        return EAGAIN;
+
+    /* infer remote addr */
+    offset = addr - f->mr->addr;
+    remote_addr = f->mr->remote_addr + offset;
+    size = CHUNK_SIZE;
+    assert(offset + size <= f->mr->size);
+
+    /* alloc data buf */
+    BUG_ON(bkend_buf == NULL);     /* not enough bufs */
+    assert(size <= BACKEND_BUF_SIZE);
+
+    /* take this slot */
+    log_debug("%s - taking read slot %d on chan %d", FSTR(f), req_id, chan_id);
+    chan->read_reqs[req_id].busy = 1;
+    chan->read_reqs[req_id].index = req_id;
+    chan->read_reqs[req_id].local_addr = (unsigned long) bkend_buf;
+    chan->read_reqs[req_id].orig_local_addr = addr;
+    chan->read_reqs[req_id].remote_addr = remote_addr;
+    chan->read_reqs[req_id].size = size;
+    chan->read_reqs[req_id].mr = f->mr;
+    chan->read_reqs[req_id].fault = f;
+
+    /*** post read - which in case of local backend is just copying the 
+     * data to the buffer and post a completion ***/
+
+    /* take a page lock to avoid concurrent page reads/writes */
+    page_lock_acquire(remote_addr);
+
+    /* copy from remote */
+    log_debug("%s - READ remote_addr %lx into local_addr %p, size %lu", FSTR(f), 
+        remote_addr, bkend_buf, size);
+    memcpy(bkend_buf, (void*) remote_addr, size);
+
+    /* post completion */
+    cq_id = chan->cq_post_idx;
+    assert(cq_id >= 0 && cq_id < MAX_REQS_PER_CHAN);
+    assert(!chan->cq[cq_id].busy);  /* cq should have enough free entries */
+    chan->cq[cq_id].req_idx = req_id;
+    chan->cq[cq_id].rwmode = READ;
+    chan->cq[cq_id].posted_tsc = rdtsc();
+    store_release(&chan->cq[cq_id].busy, 1);
+    log_debug("%s - posted cq %d on chan %d", FSTR(f), cq_id, chan_id);
+
+    /* release after completion to maintain order */
+    page_lock_release(remote_addr);
+
+    /* increment queue ids */
+    chan->read_req_idx++;
+    assert(req_id + 1 == chan->read_req_idx); /*no unexpected concurrent reads*/
+    if (chan->read_req_idx >= MAX_R_REQS_PER_CHAN) 
+        chan->read_req_idx = 0;
+
+    chan->cq_post_idx++;
+    assert(cq_id + 1 == chan->cq_post_idx); /*no unexpected concurrent posts */
+    if (chan->cq_post_idx >= MAX_REQS_PER_CHAN) 
+        chan->cq_post_idx = 0;
+
+    /* success */
+    return 0;
+}
+
+/* post read on a channel */
+int local_post_read(int chan_id, fault_t* f) {
+    struct local_channel* chan;
+    unsigned long remote_addr, offset;
+    void * local_addr;
     size_t size;
     int req_id, cq_id;
     
@@ -462,6 +541,7 @@ struct rmem_backend_ops local_backend_ops = {
     .add_memory = local_add_regions,
     .remove_region = local_free_region,
     .post_read = local_post_read,
+    .post_read_prefetch = local_post_read_prefetch, 
     .post_write = local_post_write,
     .check_for_completions = local_check_cq,
 };

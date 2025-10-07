@@ -119,6 +119,7 @@ bool is_page_prefetchable(fault_t *f, unsigned long addr) {
     pgflags_t oldflags, rflags;
 
     mr = f->mr;
+    //fprintf(stdout, "Checking mr region\n");
     if(!is_in_memory_region_unsafe(mr, addr))
 	    return false;
 
@@ -135,7 +136,7 @@ bool is_page_prefetchable(fault_t *f, unsigned long addr) {
 	was_locked = !!(oldflags & PFLAG_WORK_ONGOING);
 	if (was_locked) 
 	    return false;
-
+    
 	/* check page_present again after locking
      * XXX(shaurp): Do we need to do fault_can_rdahead?
      */ 
@@ -302,6 +303,35 @@ static inline void fault_serve_zero_pages(fault_t* f, int nchunks)
     RSTAT(FAULTS_ZP)++;
 }
 
+/* Called after a prefetched page is read from backend */
+int prefetch_read_done(void *bkend_buf, unsigned long addr, fault_t *f) {
+    int n_retries, r;
+    bool wrprotect, no_wake;
+    size_t size;
+    pgflags_t flags;
+
+    /* uffd copy the page(s) back */
+    assert(bkend_buf);
+    wrprotect = 1;
+    no_wake = 0;
+    size = CHUNK_SIZE;
+    r = uffd_copy(userfault_fd, addr, (unsigned long) bkend_buf, size, 
+        wrprotect, no_wake, true, &n_retries);
+    assertz(r);
+    RSTAT(UFFD_RETRIES) += n_retries;
+
+    /* set page flags */
+    flags = PFLAG_PRESENT;
+    if (!wrprotect) flags |= PFLAG_DIRTY;
+    set_page_flags_range(f->mr, addr, size, flags);
+
+    /* add page nodes for the pages */
+    // XXX(shaurp): We need to redo this.
+    // fault_alloc_page_nodes(f);
+
+    return 0;
+}
+
 /* Called after reading the pages from the backend completed: uffd-copies the 
  * page(s) into virtual memory and allocs page nodes */
 int fault_read_done(fault_t* f)
@@ -337,14 +367,14 @@ int fault_read_done(fault_t* f)
 
 /* Called after servicing fault is completely done: removes lock on the page 
  * and frees temporary resources */
-void fault_done(fault_t* f)
+void fault_done(fault_t* f, int chan_id)
 {
     int i, r;
     pgthread_t owner_kthr;
     pgflags_t oldflags;
  
     /* Perform the actual prefetching backend implementation */
-    page_postfetch(f, &features, &responses);
+    page_postfetch(f, &features, &responses, chan_id);
 
     /* remove lock (in ascending order) */
     if (f->locked_pages) {
@@ -386,7 +416,7 @@ void fault_done(fault_t* f)
 enum fault_status handle_page_fault(int chan_id, fault_t* fault, 
     int* nevicts_needed, struct bkend_completion_cbs* cbs)
 {
-    printf("Page fault addr: %lu\n", fault->page);
+    //printf("Page fault addr: %lu\n", fault->page);
     struct region_t* mr;
     bool page_present, was_locked, no_wake, wrprotect;
     int i, ret, n_retries, nchunks, noverflow;
@@ -472,7 +502,7 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
                 RSTAT(RDAHEADS)++;
                 RSTAT(RDAHEAD_PAGES) += fault->rdahead;
             }
-	    /* page present bit might have been updated just before we 
+	        /* page present bit might have been updated just before we 
              * locked - we should check it again after taking the lock 
              * just in case! */
             page_present = !!(pflags & PFLAG_PRESENT);

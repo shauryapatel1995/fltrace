@@ -78,6 +78,14 @@ struct rmem_backend_ops {
      * the backend. returns 0 if posted, EAGAIN if busy
      */
     int (*post_read)(int chan_id, struct fault* f);
+    /**
+     * post_read_prefetch - post read request for prefetched pages that 
+     * cannot be read ahead on the backend. returns 0 if posted, EAGAIN if busy
+     */
+    int (*post_read_prefetch)(int chan_id, struct fault* f, 
+                            unsigned long addr, void *bkend_buf);
+
+
 
     /**
      * post_write - post write request for the page range pointed by addr and 
