@@ -119,15 +119,18 @@ bool is_page_prefetchable(fault_t *f, unsigned long addr) {
     pgflags_t oldflags, rflags;
 
     mr = f->mr;
-    //fprintf(stdout, "Checking mr region\n");
     if(!is_in_memory_region_unsafe(mr, addr))
 	    return false;
+
+	rflags = get_page_flags(mr, addr);
+    /* This page hasn't been accessed by the app yet, don't prefault it */
+    if (!(rflags & PFLAG_REGISTERED))
+        return false;
 
 	/* See if the page is already present 
      * XXX(shaurp): Confirm if the other requriments from
      * fault_can_rdahead are necessary for us.
      */
-	rflags = get_page_flags(mr, addr);
 	if (rflags & PFLAG_PRESENT)
 	    return false;
 
@@ -347,7 +350,7 @@ static inline void fault_serve_zero_pages(fault_t* f, int nchunks)
 }
 
 /* Called after a prefetched page is read from backend */
-int prefetch_read_done(void *bkend_buf, unsigned long addr, fault_t *f) {
+int prefetch_read_done(unsigned long addr, void *bkend_buf, fault_t *f) {
     int n_retries, r;
     bool wrprotect, no_wake;
     size_t size;
@@ -356,7 +359,9 @@ int prefetch_read_done(void *bkend_buf, unsigned long addr, fault_t *f) {
     /* uffd copy the page(s) back */
     assert(bkend_buf);
     wrprotect = 1;
-    no_wake = 0;
+    no_wake = 1;
+    
+    fprintf(stdout, "Reading address %lu from %lu\n", addr, bkend_buf);
     size = CHUNK_SIZE;
     r = uffd_copy(userfault_fd, addr, (unsigned long) bkend_buf, size, 
         wrprotect, no_wake, true, &n_retries);
@@ -458,7 +463,7 @@ void fault_done(fault_t* f, int chan_id, int *nevicts_needed)
 enum fault_status handle_page_fault(int chan_id, fault_t* fault, 
     int* nevicts_needed, struct bkend_completion_cbs* cbs)
 {
-    //printf("Page fault addr: %lu\n", fault->page);
+    printf("Page fault addr: %lu\n", fault->page);
     struct region_t* mr;
     bool page_present, was_locked, no_wake, wrprotect;
     int i, ret, n_retries, nchunks, noverflow;

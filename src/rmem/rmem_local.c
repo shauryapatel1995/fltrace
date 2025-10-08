@@ -87,6 +87,7 @@ static inline void page_lock_acquire(unsigned long remote_addr)
         spin_lock(&pglocks[lock_id]);
     }
 
+    fprintf(stdout, "Locking page\n");
     assert_spin_lock_held(&pglocks[lock_id]);
     pglock_holders[lock_id] = remote_addr;
 }
@@ -197,6 +198,7 @@ int local_post_read_prefetch(int chan_id, fault_t *f,
 
     /* infer remote addr */
     offset = addr - f->mr->addr;
+    assert(offset > 0);
     remote_addr = f->mr->remote_addr + offset;
     size = CHUNK_SIZE;
     assert(offset + size <= f->mr->size);

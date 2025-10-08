@@ -96,10 +96,10 @@ static inline fault_t* read_uffd_fault()
         }
 
         /* new fault */
-	faulting_addr = message.arg.pagefault.address;
-        addr = faulting_addr & (~(4096 - 1));
+	    faulting_addr = message.arg.pagefault.address;
+        addr = faulting_addr & ~CHUNK_MASK;
         flags = message.arg.pagefault.flags;
-	pc = message.arg.pagefault.pc;
+	    pc = message.arg.pagefault.pc;
         log_debug("uffd pagefault event %d: addr=%llx, flags=0x%llx",
             message.event, addr, flags);
 
@@ -113,8 +113,8 @@ static inline fault_t* read_uffd_fault()
         /* populate it */
         memset(fault, 0, sizeof(fault_t));
         fault->page = addr & ~CHUNK_MASK;
-	fault->pc = pc;
-	fault->faulting_addr = addr;
+	    fault->pc = pc;
+	    fault->faulting_addr = addr;
         fault->is_wrprotect = !!(flags & UFFD_PAGEFAULT_FLAG_WP);
         fault->is_write = !!(flags & UFFD_PAGEFAULT_FLAG_WRITE);
         fault->is_read = !(fault->is_write || fault->is_wrprotect);
@@ -141,10 +141,11 @@ static inline fault_t* read_uffd_fault()
             flags |= FSAMPLER_FAULT_FLAG_ZERO;
 
         /* record if sampling faults */
-	//XXX(shaurp): This doesn't work anymore because we updated userfaultfd
-	//to not report the process ID anymore.
-        //fsampler_add_fault_sample(my_hthr->fsampler_id, addr, flags,
-        //    0);
+	    /* XXX(shaurp): This doesn't work anymore because we updated userfaultfd
+	     * to not report the process ID anymore.
+         * fsampler_add_fault_sample(my_hthr->fsampler_id, addr, flags,
+         *   0);
+         */
 #endif
 
         return fault;

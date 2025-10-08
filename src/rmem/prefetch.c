@@ -47,19 +47,19 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
 
     /* Setup pointer features */
     for(int i = 0; i < 512; i++, ptr++) {
-	FeatureVector *feature = &features[i];
-	feature->pc = f->pc;
-	feature->offset = i;
-	feature->delta = (*ptr - f->page) / 4096;
-	feature->offset_from_faulting = i - faulting_location;
+        FeatureVector *feature = &features[i];
+        feature->pc = f->pc;
+        feature->offset = i;
+        feature->delta = (*ptr - f->page) / 4096;
+        feature->offset_from_faulting = i - faulting_location;
     }
     /* Setup next-N features */
     for (int i = 512; i < 600; i++) {
-	FeatureVector *feature = &features[i];
-	feature->pc = f->pc;
-	feature->offset = 0; 
-	feature->delta = i - 512; 
-	feature->offset_from_faulting = 0;
+        FeatureVector *feature = &features[i];
+        feature->pc = f->pc;
+        feature->offset = 0; 
+        feature->delta = i - 512; 
+        feature->offset_from_faulting = 0;
     } 
 #ifdef benchmark_model
     gettimeofday(&t1, NULL);
@@ -86,6 +86,7 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
 	    if (responses[i] == 0)
 		    continue;
         uint64_t ptr_val = *((uint64_t *) f->page + i); 
+        ptr_val = ptr_val & ~CHUNK_MASK;
         if(is_page_prefetchable(f, ptr_val)) {
             fprintf(stdout, "Prefetch address: %lu\n", ptr_val);
             /* Copy the page into the local buffer from remote */
@@ -114,6 +115,7 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
 	    if (responses[i] == 0)
 		    continue;
         uint64_t ptr_val =  f->page + (i - 512); 
+        ptr_val = ptr_val & ~CHUNK_MASK;
         if(is_page_prefetchable(f, ptr_val)) { 
             fprintf(stdout, "Prefetch address: %lu\n", ptr_val);
             /* Copy the page into a local buffer from remote */
