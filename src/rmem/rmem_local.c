@@ -199,6 +199,7 @@ int local_post_read_prefetch(int chan_id, fault_t *f,
     /* infer remote addr */
     offset = addr - f->mr->addr;
     assert(offset > 0);
+    assert(offset < f->mr->addr + f->mr->size);
     remote_addr = f->mr->remote_addr + offset;
     size = CHUNK_SIZE;
     assert(offset + size <= f->mr->size);

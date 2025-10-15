@@ -1,4 +1,3 @@
-
 /*
  * fault.c - fault handling common
  */
@@ -372,7 +371,7 @@ int prefetch_read_done(unsigned long addr, void *bkend_buf, fault_t *f) {
     printf("DEBUG: Original fault addr=0x%lx, fault page=0x%lx\n", f->faulting_addr, f->page);
     
     size = CHUNK_SIZE;
-    r = uffd_copy(userfault_fd, addr, (unsigned long) bkend_buf, size, 
+    r = uffd_copy(userfault_fd, (unsigned long) addr, (unsigned long) bkend_buf, size, 
         wrprotect, no_wake, true, &n_retries);
     assertz(r);
     RSTAT(UFFD_RETRIES) += n_retries;
