@@ -362,6 +362,15 @@ int prefetch_read_done(unsigned long addr, void *bkend_buf, fault_t *f) {
     no_wake = 1;
     
     fprintf(stdout, "Reading address %lu from %lu\n", addr, bkend_buf);
+    
+    // Debug prints for uffd_copy validation
+    printf("DEBUG: prefetch_read_done addr=0x%lx, bkend_buf=0x%lx\n", addr, (unsigned long)bkend_buf);
+    printf("DEBUG: addr aligned? %s, bkend_buf aligned? %s\n", 
+           (addr % 4096 == 0) ? "YES" : "NO",
+           ((unsigned long)bkend_buf % 4096 == 0) ? "YES" : "NO");
+    printf("DEBUG: size=%zu, userfault_fd=%d\n", CHUNK_SIZE, userfault_fd);
+    printf("DEBUG: Original fault addr=0x%lx, fault page=0x%lx\n", f->faulting_addr, f->page);
+    
     size = CHUNK_SIZE;
     r = uffd_copy(userfault_fd, addr, (unsigned long) bkend_buf, size, 
         wrprotect, no_wake, true, &n_retries);
