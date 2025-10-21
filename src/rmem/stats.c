@@ -20,6 +20,7 @@ const char *rstat_names[] = {
     "uffd_retries",
     "rdahead_ops",
     "rdahead_pages",
+    "prefetched_pages",
 
     /* eviction stats */
     "evict_ops",

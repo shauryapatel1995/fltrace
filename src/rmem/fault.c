@@ -133,6 +133,12 @@ bool is_page_prefetchable(fault_t *f, unsigned long addr) {
 	if (rflags & PFLAG_PRESENT)
 	    return false;
 
+    /*
+     * Check whether the page is locked.
+     */
+    if (rflags & PFLAG_WORK_ONGOING)
+	    return false;
+
 	/* try locking */
 	rflags = set_page_flags(mr, addr, PFLAG_WORK_ONGOING, &oldflags);
 	was_locked = !!(oldflags & PFLAG_WORK_ONGOING);

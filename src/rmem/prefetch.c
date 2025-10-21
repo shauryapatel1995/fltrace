@@ -58,7 +58,7 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
         FeatureVector *feature = &features[i];
         feature->pc = f->pc;
         feature->offset = 0; 
-        feature->delta = i - 512; 
+        feature->delta = i - 511; 
         feature->offset_from_faulting = 0;
     } 
 #ifdef benchmark_model
@@ -88,7 +88,7 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
         uint64_t ptr_val = *((uint64_t *) f->page + i); 
         ptr_val = ptr_val & ~CHUNK_MASK;
         if(is_page_prefetchable(f, ptr_val)) {
-            fprintf(stdout, "Prefetch address: %lu\n", ptr_val);
+            fprintf(stdout, "Pointer prefetch address: %lu\n", ptr_val);
             /* Copy the page into the local buffer from remote */
             if(rmbackend->post_read_prefetch(chan_id, f, ptr_val, local_addr)) {
                 //XXX(shaurp): Remove the pgflag ongoing flag here
@@ -111,10 +111,10 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
         }
     }
 
-    for (int i = 0; i < 512; i++) {
+    for (int i = 512; i < 600; i++) {
 	    if (responses[i] == 0)
 		    continue;
-        uint64_t ptr_val =  f->page + (i - 512); 
+        uint64_t ptr_val =  f->page + (i - 511); 
         ptr_val = ptr_val & ~CHUNK_MASK;
         if(is_page_prefetchable(f, ptr_val)) { 
             fprintf(stdout, "Prefetch address: %lu\n", ptr_val);

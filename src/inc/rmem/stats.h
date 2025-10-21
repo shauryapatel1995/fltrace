@@ -23,6 +23,7 @@ enum {
     RSTAT_UFFD_RETRIES,
     RSTAT_RDAHEADS,
     RSTAT_RDAHEAD_PAGES,
+    RSTAT_PREFETCHES,
 
     /* eviction stats */
     RSTAT_EVICTS,

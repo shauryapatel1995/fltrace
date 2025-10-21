@@ -38,6 +38,7 @@ struct local_request {
 enum req_mode_t {
     WRITE,
     READ,
+    PREFETCH,
 };
 
 struct local_completion {
@@ -235,7 +236,7 @@ int local_post_read_prefetch(int chan_id, fault_t *f,
     assert(cq_id >= 0 && cq_id < MAX_REQS_PER_CHAN);
     assert(!chan->cq[cq_id].busy);  /* cq should have enough free entries */
     chan->cq[cq_id].req_idx = req_id;
-    chan->cq[cq_id].rwmode = READ;
+    chan->cq[cq_id].rwmode = PREFETCH;
     chan->cq[cq_id].posted_tsc = rdtsc();
     store_release(&chan->cq[cq_id].busy, 1);
     log_debug("%s - posted cq %d on chan %d", FSTR(f), cq_id, chan_id);
@@ -507,7 +508,18 @@ int local_check_cq(int chan_id, struct bkend_completion_cbs* cbs, int max_cqe,
             store_release(&req->busy, 0);
             RSTAT(NET_READ)++;
             if (nread)  (*nread)++;
-        }
+        } /* Check if we need to handle the prefetch
+           * requests here. For now we assume that the request is
+           * already taken care of synchronously during prefetch.
+           * just clear out the queue.
+           */
+        else if (wc[i].rwmode == PREFETCH) {
+            assert(req_id < MAX_R_REQS_PER_CHAN);
+            req = &(channels[chan_id]->read_reqs[req_id]);
+            assert(req->busy);
+            store_release(&req->busy, 0);
+            RSTAT(PREFETCHES)++;
+        } 
         else {
             /* handle write completion */
             assert(wc[i].rwmode == WRITE);
