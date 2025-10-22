@@ -154,7 +154,7 @@ static inline fault_t* read_uffd_fault()
 }
 
 /**
- * Main handler thread function
+ * Main handler threadfunction
  */
 static void* rmem_handler(void *arg) 
 {

@@ -19,6 +19,8 @@
 #include "rmem/uffd.h"
 #include "rmem/prefetch.h"
 
+#define DO_PREFETCH 0
+//#define DO_RDAHEAD 0
 /* fault handling common state */
 __thread void* zero_page = NULL;
 __thread char fstr[__FAULT_STR_LEN];
@@ -41,19 +43,19 @@ void prefetch_init() {
     /* Setup pointer features */
     for(int i = 0; i < 512; i++) {
         FeatureVector feature = features[i];
-	feature.pc = 0;
-	feature.offset = i;
-	feature.delta = -1;
-	feature.offset_from_faulting = 0;
+        feature.pc = 0;
+        feature.offset = i;
+        feature.delta = -1;
+        feature.offset_from_faulting = 0;
     }
 
     /* Setup next-N features */
     for (int i = 512; i < 600; i++) {
-	FeatureVector feature = features[i];
-	feature.pc = 0;
-	feature.offset = -1; 
-	feature.delta = i; 
-	feature.offset_from_faulting = -1;
+        FeatureVector feature = features[i];
+        feature.pc = 0;
+        feature.offset = -1; 
+        feature.delta = i; 
+        feature.offset_from_faulting = -1;
     }
 }
 
@@ -366,15 +368,15 @@ int prefetch_read_done(unsigned long addr, void *bkend_buf, fault_t *f) {
     wrprotect = 1;
     no_wake = 1;
     
-    fprintf(stdout, "Reading address %lu from %lu\n", addr, bkend_buf);
+    // fprintf(stdout, "Reading address %lu from %lu\n", addr, bkend_buf);
     
     // Debug prints for uffd_copy validation
-    printf("DEBUG: prefetch_read_done addr=0x%lx, bkend_buf=0x%lx\n", addr, (unsigned long)bkend_buf);
-    printf("DEBUG: addr aligned? %s, bkend_buf aligned? %s\n", 
-           (addr % 4096 == 0) ? "YES" : "NO",
-           ((unsigned long)bkend_buf % 4096 == 0) ? "YES" : "NO");
-    printf("DEBUG: size=%zu, userfault_fd=%d\n", CHUNK_SIZE, userfault_fd);
-    printf("DEBUG: Original fault addr=0x%lx, fault page=0x%lx\n", f->faulting_addr, f->page);
+    //printf("DEBUG: prefetch_read_done addr=0x%lx, bkend_buf=0x%lx\n", addr, (unsigned long)bkend_buf);
+    //printf("DEBUG: addr aligned? %s, bkend_buf aligned? %s\n", 
+    //       (addr % 4096 == 0) ? "YES" : "NO",
+    //       ((unsigned long)bkend_buf % 4096 == 0) ? "YES" : "NO");
+    //printf("DEBUG: size=%zu, userfault_fd=%d\n", CHUNK_SIZE, userfault_fd);
+    //printf("DEBUG: Original fault addr=0x%lx, fault page=0x%lx\n", f->faulting_addr, f->page);
     
     size = CHUNK_SIZE;
     r = uffd_copy(userfault_fd, (unsigned long) addr, (unsigned long) bkend_buf, size, 
@@ -433,9 +435,13 @@ void fault_done(fault_t* f, int chan_id, int *nevicts_needed)
     int i, r;
     pgthread_t owner_kthr;
     pgflags_t oldflags;
- 
+
+#ifdef DO_PREFETCH 
     /* Perform the actual prefetching backend implementation */
-    page_postfetch(f, &features, &responses, chan_id, nevicts_needed);
+    /* XXX: hack for now reducing the PC scope */
+    if (f->pc == 93824992237560)
+        page_postfetch(f, &features, &responses, chan_id, nevicts_needed);
+#endif
 
     /* remove lock (in ascending order) */
     if (f->locked_pages) {
@@ -477,7 +483,6 @@ void fault_done(fault_t* f, int chan_id, int *nevicts_needed)
 enum fault_status handle_page_fault(int chan_id, fault_t* fault, 
     int* nevicts_needed, struct bkend_completion_cbs* cbs)
 {
-    printf("Page fault addr: %lu\n", fault->page);
     struct region_t* mr;
     bool page_present, was_locked, no_wake, wrprotect;
     int i, ret, n_retries, nchunks, noverflow;
@@ -496,6 +501,7 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
         /* some other fault addressed the page, fault done */
         fault->uffd_explicit_wake = fault->from_kernel;
         log_debug("%s - fault done, was redundant", FSTR(fault));
+        RSTAT(FAULTS_REDUNDANT)++;
         return FAULT_DONE;
     }
     else {
@@ -528,7 +534,11 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
              * a lock on the next few pages that have similar requirements 
              * as the current page so we can make the same choices for them 
              * throughout the fault handling */
-	        //page_prefetch(features, &responses);
+            /* TODO(shaurp): Make readahead also part of the prefetch and 
+             * add leap as well.
+	         * page_prefetch(features, &responses);
+             */
+#ifdef DO_RDAHEAD
             for (i = 1; i <= fault->rdahead_max; i++) {
                 addr = fault->page + i * CHUNK_SIZE;
                 if(!is_in_memory_region_unsafe(mr, addr))
@@ -559,6 +569,7 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
                 nchunks++;
                 fault->rdahead++;
             }
+#endif
             if (nchunks > 1) {
                 RSTAT(RDAHEADS)++;
                 RSTAT(RDAHEAD_PAGES) += fault->rdahead;
@@ -594,7 +605,6 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
                 fault_upgrade_to_write(fault, "from wrprotect on no page");
                 RSTAT(WP_UPGRADES)++;
             }
-
 #ifndef TRACK_DIRTY
             /* no dirty page tracking means every fault is a write fault */
             if (fault->is_read)

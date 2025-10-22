@@ -518,7 +518,6 @@ int local_check_cq(int chan_id, struct bkend_completion_cbs* cbs, int max_cqe,
             req = &(channels[chan_id]->read_reqs[req_id]);
             assert(req->busy);
             store_release(&req->busy, 0);
-            RSTAT(PREFETCHES)++;
         } 
         else {
             /* handle write completion */

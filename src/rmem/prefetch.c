@@ -95,6 +95,8 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
                 goto out; 
             }
             prefetch_read_done(ptr_val, local_addr, f);
+            fprintf(stderr, "Prefetch\n");
+            RSTAT(PREFETCHES)++;
             num_prefetches++;
             clear_page_flags_and_thread(f->mr, ptr_val, 
                 PFLAG_WORK_ONGOING, &oldflags, &owner_kthr);
@@ -124,6 +126,8 @@ unsigned long page_postfetch(fault_t * f, FeatureVector *features,
                 goto out; 
             }
             prefetch_read_done(ptr_val, local_addr, f);
+            RSTAT(PREFETCHES)++;
+            fprintf(stderr, "Prefetch\n");
             num_prefetches++;
             clear_page_flags_and_thread(f->mr, ptr_val, 
                 PFLAG_WORK_ONGOING, &oldflags, &owner_kthr);
