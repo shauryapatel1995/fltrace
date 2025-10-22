@@ -19,6 +19,7 @@
 #include "rmem/stats.h"
 #include "rmem/uffd.h"
 
+#define DO_TRACING 1
 /* fault handling common state */
 __thread void* zero_page = NULL;
 __thread char fstr[__FAULT_STR_LEN];
@@ -271,12 +272,14 @@ void fault_done(fault_t* f)
     pgthread_t owner_kthr;
     pgflags_t oldflags;
     uint64_t *p = (uint64_t*) f->page; 
+#ifdef DO_TRACING
     for(i = 0; i < 512; i++, p++) {
         if (*p == 0)
 		continue;
 	// TODO(shaurp): Fix the present bit here.
 	fprintf(stderr, "Loc: %d, val: %llx, present:%d\n", i, *p, 1);
     }
+#endif
 
     /* remove lock (in ascending order) */
     if (f->locked_pages) {

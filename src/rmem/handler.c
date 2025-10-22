@@ -25,6 +25,7 @@
 #include "rmem/region.h"
 #include "rmem/uffd.h"
 
+#define DO_TRACING 1
 /* handler state */
 __thread struct hthread *my_hthr = NULL;
 __thread int current_stealing_kthr_id = -1;
@@ -96,13 +97,14 @@ static inline fault_t* read_uffd_fault()
         }
 
         /* new fault */
-        faulting_addr = message.arg.pagefault.address;
-        addr = faulting_addr & (~(4096 - 1)) ;
-        flags = message.arg.pagefault.flags;
+    faulting_addr = message.arg.pagefault.address;
+    addr = faulting_addr & (~(4096 - 1)) ;
+    flags = message.arg.pagefault.flags;
 	pc = message.arg.pagefault.pc;
 	pagefault_index++;
-
+#ifdef DO_TRACING
 	fprintf(stderr, "\"%d PF addr, faulting addr, and ip\", %lx %lx %lx\n", pagefault_index, addr, faulting_addr, pc);
+#endif
         log_debug("uffd pagefault event %d: addr=%llx, flags=0x%llx",
             message.event, addr, flags);
 
@@ -142,8 +144,8 @@ static inline fault_t* read_uffd_fault()
             flags |= FSAMPLER_FAULT_FLAG_ZERO;
 
         /* record if sampling faults */
-        fsampler_add_fault_sample(my_hthr->fsampler_id, addr, flags,
-            0);
+        //fsampler_add_fault_sample(my_hthr->fsampler_id, addr, flags,
+        //    0);
 #endif
 
         return fault;
