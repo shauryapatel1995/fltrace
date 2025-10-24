@@ -186,7 +186,7 @@ int local_post_read_prefetch(int chan_id, fault_t *f,
     int req_id, cq_id;
     
     /* get channel */
-    log_debug("%s - posting read", addr);
+    log_debug("%lu - posting read", addr);
     assert(chan_id >= 0 && chan_id < nchans_bkend);
     chan = channels[chan_id];
 

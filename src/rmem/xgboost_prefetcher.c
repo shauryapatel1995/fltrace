@@ -316,7 +316,7 @@ void free_model(XGBoostModel* model) {
 
 
 void init_prefetcher() {
-    const char* model_path = "/data1/deku/models/random-ll-fltrace_xgboost_model.json";
+    const char* model_path = "/data1/deku/models/mcf-fltrace_xgboost_model.json";
     
     pthread_mutex_lock(&model_init_lock);
     
@@ -357,7 +357,7 @@ void init_prefetcher() {
  * Reponse arr: Output predictions.
  */
 unsigned long page_prefetch_preds(FeatureVector features[], int *response_arr) {
-
+    return 0;
 }
 
 /*
@@ -367,20 +367,18 @@ unsigned long page_prefetch_preds(FeatureVector features[], int *response_arr) {
  * Features: input features computed at pagefault.
  * Reponse arr: Output predictions.
  */
-unsigned long page_postfetch_preds(FeatureVector features[], int *response_arr) {
+unsigned long page_postfetch_preds(FeatureVector features[], int *response_arr, int batch_size) {
     
     if (!global_model || !global_model->is_loaded) {
         printf("Model not initialized. Call init_prefetcher() first.\n");
         return 1;
     }
-    /*
-    // Debug features
-    for(int i = 0; i < 600; i++) { 
-	    fprintf(stdout, "During prefetch: %lu, %f, %lu, %lu\n", features[i].pc, features[i].delta, features[i].offset, features[i].offset_from_faulting);
-    } */
-    for(int i = 0; i < 600; i++) {
+
+    for(int i = 0; i < batch_size; i++) {
 	    float prediction_prob;
 	    response_arr[i] = 0;
+        assert(global_model);
+        assert(features != NULL);
 	    if (predict_single(global_model, &features[i], &prediction_prob) == 0) {
 		int prediction_binary = probability_to_prediction(prediction_prob);
 		response_arr[i] = prediction_binary;
@@ -389,9 +387,9 @@ unsigned long page_postfetch_preds(FeatureVector features[], int *response_arr) 
 			printf("Prediction probability: %.6f\n", prediction_prob);
 			printf("Binary prediction: %d (%s)\n", prediction_binary, 
 			       prediction_binary ? "Cache Hit" : "Cache Miss");
-		} */
+		    } */
 	    } else {
-		fprintf(stderr, "Single prediction failed\n");
+		    fprintf(stderr, "Single prediction failed\n");
 	    }
     }
 

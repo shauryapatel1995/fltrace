@@ -21,7 +21,7 @@ typedef struct {
 /* methods */
 void init_prefetcher();
 unsigned long page_prefetch_preds(FeatureVector features[], int *response_arr);
-unsigned long page_postfetch_preds(FeatureVector features[], int *response_arr);
+unsigned long page_postfetch_preds(FeatureVector features[], int *response_arr, int batch_size);
 unsigned long page_postfetch(fault_t *f, FeatureVector features[], int *response_arr, int chan_id, int *nevicts_needed);
 
 #endif // __PREFETCH_H

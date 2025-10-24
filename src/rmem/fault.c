@@ -19,7 +19,7 @@
 #include "rmem/uffd.h"
 #include "rmem/prefetch.h"
 
-#define DO_PREFETCH 0
+//#define DO_PREFETCH 0
 //#define DO_RDAHEAD 0
 /* fault handling common state */
 __thread void* zero_page = NULL;
@@ -42,20 +42,18 @@ void prefetch_init() {
 
     /* Setup pointer features */
     for(int i = 0; i < 512; i++) {
-        FeatureVector feature = features[i];
-        feature.pc = 0;
-        feature.offset = i;
-        feature.delta = -1;
-        feature.offset_from_faulting = 0;
+        features[i].pc = 0;
+        features[i].offset = i;
+        features[i].delta = -1;
+        features[i].offset_from_faulting = 0;
     }
 
     /* Setup next-N features */
     for (int i = 512; i < 600; i++) {
-        FeatureVector feature = features[i];
-        feature.pc = 0;
-        feature.offset = -1; 
-        feature.delta = i; 
-        feature.offset_from_faulting = -1;
+        features[i].pc = 0;
+        features[i].offset = -1; 
+        features[i].delta = i; 
+        features[i].offset_from_faulting = -1;
     }
 }
 
@@ -202,7 +200,7 @@ int __always_inline get_highest_evict_gen(void)
  * nodes to the eviction lists */
 static inline void prefetch_alloc_page_nodes(unsigned long addr, fault_t* f)
 {
-    int i, prio;
+    int prio;
     struct rmpage_node* pgnode;
     struct list_head new;
     struct page_list* evict_gen;
@@ -438,9 +436,8 @@ void fault_done(fault_t* f, int chan_id, int *nevicts_needed)
 
 #ifdef DO_PREFETCH 
     /* Perform the actual prefetching backend implementation */
-    /* XXX: hack for now reducing the PC scope */
-    if (f->pc == 93824992237560)
-        page_postfetch(f, &features, &responses, chan_id, nevicts_needed);
+    /* TODO(shaurp): Check what PC's we should run for */
+    page_postfetch(f, features, responses, chan_id, nevicts_needed);
 #endif
 
     /* remove lock (in ascending order) */
@@ -485,9 +482,12 @@ enum fault_status handle_page_fault(int chan_id, fault_t* fault,
 {
     struct region_t* mr;
     bool page_present, was_locked, no_wake, wrprotect;
-    int i, ret, n_retries, nchunks, noverflow;
-    pgflags_t pflags, rflags, oldflags;
+    int ret, n_retries, nchunks, noverflow;
+    pgflags_t pflags, oldflags;
+#ifdef DO_RDAHEAD
+    pgflags_t rflags
     unsigned long addr;
+#endif
     unsigned long long pressure;
     uint64_t start_tsc, duration;
     enum fault_status status;

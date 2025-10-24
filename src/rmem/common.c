@@ -174,6 +174,7 @@ int rmem_common_destroy_thread()
  */
 int rmem_common_destroy()
 {
+    fprintf(stdout, "Exiting\n");
     int i, ret;
     struct region_t *mr;
 

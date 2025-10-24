@@ -119,6 +119,7 @@ enum fault_status {
 
 
 bool is_page_prefetchable(fault_t *f, unsigned long addr);
+int prefetch_read_done(unsigned long addr, void *bkend_buf, fault_t *f);
 struct bkend_completion_cbs;
 enum fault_status handle_page_fault(int chan_id, fault_t* fault, int* nevicts, 
     struct bkend_completion_cbs* cbs);
